@@ -42,10 +42,10 @@ runs:
       id: split-tests
       run: |
         # setup split type
-        if [ -z "${{ inputs.junit-path }}" ]; then
-          echo "juint-path set. Splitting based on JUnit timings"
+        if [ -n "${{ inputs.junit-path }}" ]; then
+          echo "junit-path set. Splitting based on JUnit timings"
           SPLIT_BY="-junit -junit-path=${{ inputs.junit-path }}"
-        elif [ -z "${{ inputs.line-count }}" ]; then
+        elif [ -n "${{ inputs.line-count }}" ]; then
           echo "line-count set. Splitting based on test line count"
           SPLIT_BY="-line-count"
         else
@@ -53,7 +53,12 @@ runs:
           SPLIT_BY=""
         fi
 
-        TESTS=split_tests ${SPLIT_BY} -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob=${{ inputs.glob }} -exclude-glob=${{ inputs.exclude-glob }}
+        EXCLUDE_GLOB=""
+        if [ -n "${{ inputs.exclude-glob }}" ]; then
+          EXCLUDE_GLOB="-exclude-glob=${{ inputs.exclude-glob }}"
+        fi
+
+        TESTS=$(./split_tests ${SPLIT_BY} -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob=${{ inputs.glob }} ${EXCLUDE_GLOB})
 
         echo "::set-output name=test-suite::$(echo $TESTS)"
       shell: bash
