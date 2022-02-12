@@ -1,0 +1,59 @@
+name: Split Tests
+author: chaosaffe@users.noreply.github.com
+description: Splits test suite for parallelization with equal time
+inputs:
+  split-total:
+    description: Total number of instances executing the tests (integer)
+    required: true
+  split-index:
+    description: Index of this instance executing the tests (integer)
+    required: true
+  glob:
+    description: Glob pattern to find test files (default "spec/**/*_spec.rb") (string)
+    required: false
+    default: spec/**/*_spec.rb
+  exclude-glob:
+    description: Glob pattern to exclude test files (string)
+    required: false
+    default: ""
+  junit-path:
+    description: Path to a JUnit XML report to use for test timings (string)
+    required: false
+  line-count:
+    description: Use line count to estimate test times (boolean)
+    required: false
+outputs:
+  test-suite:
+    description: "A set of tests that have been split"
+    value: ${{ steps.split-tests.outputs.test-suite }}
+  split-total:
+    description: Total number of instances executing the tests
+    value: ${{ inputs.split-total }}
+  split-index:
+    description: Index of this instance executing the tests
+    value: ${{ inputs.split-index }}
+runs:
+  using: composite
+  steps:
+    - name: Install split_tests
+      run: curl -L "https://github.com/leonid-shevtsov/split_tests/releases/latest/download/split_tests.linux.gz" | gunzip -v > split_tests && chmod +x split_tests
+      shell: bash
+    - name: Split Tests
+      id: split-tests
+      run: |
+        # setup split type
+        if [ -z "${{ inputs.line-count }}" ]; then
+          SPLIT_BY="-line-count"
+        elif [ -z "${{ inputs.junit-path }}" ]; then
+          SPLIT_BY="-junit -junit-path=${{ inputs.junit-path }}"
+        else
+          SPLIT_BY=""
+        fi
+
+        TESTS=split_tests ${SPLIT_BY} -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob=${{ inputs.glob }} -exclude-glob=${{ inputs.exclude-glob }}
+
+        echo "::set-output name=test-suite::$(echo $TESTS)"
+      shell: bash
+branding:
+  icon: shuffle
+  color: orange
