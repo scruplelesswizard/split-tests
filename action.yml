@@ -42,11 +42,14 @@ runs:
       id: split-tests
       run: |
         # setup split type
-        if [ -z "${{ inputs.line-count }}" ]; then
-          SPLIT_BY="-line-count"
-        elif [ -z "${{ inputs.junit-path }}" ]; then
+        if [ -z "${{ inputs.junit-path }}" ]; then
+          echo "juint-path set. Splitting based on JUnit timings"
           SPLIT_BY="-junit -junit-path=${{ inputs.junit-path }}"
+        elif [ -z "${{ inputs.line-count }}" ]; then
+          echo "line-count set. Splitting based on test line count"
+          SPLIT_BY="-line-count"
         else
+          echo "No split type arguments set. Using default"
           SPLIT_BY=""
         fi
 
