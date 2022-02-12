@@ -1,0 +1,14 @@
+on:
+  push: {}
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    name: Smoke Test Action
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./
+        name: Run this action
+        with:
+          split-total: 5
+          split-index: 0
