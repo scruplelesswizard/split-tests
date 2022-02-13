@@ -24,7 +24,7 @@ inputs:
     required: false
 outputs:
   test-suite:
-    description: "A set of tests that have been split"
+    description: "A subset of tests, based on the the split index and split type"
     value: ${{ steps.split-tests.outputs.test-suite }}
   split-total:
     description: Total number of instances executing the tests
