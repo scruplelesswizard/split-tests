@@ -32,7 +32,7 @@ jobs:
         with:
           repository: eliotsykes/rspec-rails-examples
           path: examples/
-      - uses: chaosaffe/split-tests@13b4704543f2c6e46af4ba7fc4e6fb4d0cef7c3c
+      - uses: chaosaffe/split-tests@v1-alpha.1
         id: split-tests
         name: Split tests
         with:
