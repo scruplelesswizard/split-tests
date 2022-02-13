@@ -30,5 +30,41 @@ This actions allows you to split up a suite of tests so they can be executed in 
 ### Example Workflow
 
 ```yaml
+env:
+  total-runners: 5
 
+jobs:
+  runner-indexes:
+    runs-on: ubuntu-latest
+    name: Generate runner indexes
+    outputs:
+      json: ${{ steps.generate-index-list.outputs.json }}
+    steps:
+      - id: generate-index-list
+        run: |
+          MAX_INDEX=$((${{ env.total-runners }}-1))
+          INDEX_LIST=$(seq 0 ${MAX_INDEX})
+          INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
+          echo "::set-output name=json::${INDEX_JSON}"
+
+  run-parallel-tests:
+    runs-on: ubuntu-latest
+    name: "Runner #${{ matrix.runner-index }}: Run test suite in parallel"
+    needs:
+      - runner-indexes
+    strategy:
+      matrix:
+        runner-index: ${{ fromjson(needs.runner-indexes.outputs.json) }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: chaosaffe/split-tests@v1-alpha.1
+        id: split-tests
+        name: Split tests
+        with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: ${{ env.total-runners }}
+          split-index: ${{ matrix.runner-index }}
+      - run: 'echo "This runner will execute the following tests: ${{ steps.split-tests.outputs.test-suite }}"'
 ```
+
+The full example workflow can be found at [.github/workflows/example.yaml](.github/workflows/example.yaml)
