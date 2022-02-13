@@ -4,7 +4,7 @@ on:
 jobs:
   syntax-test:
     runs-on: ubuntu-latest
-    name: Smoke Test Default
+    name: Syntax Test
     steps:
       - uses: actions/checkout@v2
       - uses: actions/checkout@v2
@@ -51,8 +51,27 @@ jobs:
         id: split-tests
         name: Run this action
         with:
-          glob: examples/spec/**/*_spec.rb
           line-count: true
+          glob: examples/spec/**/*_spec.rb
+          split-total: 5
+          split-index: 1
+      - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
+
+  smoke-test-junit:
+    runs-on: ubuntu-latest
+    name: Smoke Test JUnit
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+      - uses: ./
+        id: split-tests
+        name: Run this action
+        with:
+          junit-path:
+          glob: examples/spec/**/*_spec.rb
           split-total: 5
           split-index: 1
       - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
