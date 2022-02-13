@@ -60,6 +60,8 @@ runs:
 
         TESTS=$(./split_tests ${SPLIT_BY} -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob=${{ inputs.glob }} ${EXCLUDE_GLOB})
 
+        echo $TESTS
+
         echo "::set-output name=test-suite::$(echo $TESTS)"
       shell: bash
 branding:

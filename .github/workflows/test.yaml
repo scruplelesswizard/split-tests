@@ -2,13 +2,57 @@ on:
   push: {}
 
 jobs:
-  smoke-test:
+  syntax-test:
     runs-on: ubuntu-latest
-    name: Smoke Test Action
+    name: Smoke Test Default
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
       - uses: ./
+        id: split-tests
         name: Run this action
         with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: 5
+          split-index: 2
+      - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
+
+  smoke-test-default:
+    runs-on: ubuntu-latest
+    name: Smoke Test Default
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+      - uses: ./
+        id: split-tests
+        name: Run this action
+        with:
+          glob: examples/spec/**/*_spec.rb
           split-total: 5
           split-index: 0
+      - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
+
+  smoke-test-line:
+    runs-on: ubuntu-latest
+    name: Smoke Test Line Count
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+      - uses: ./
+        id: split-tests
+        name: Run this action
+        with:
+          glob: examples/spec/**/*_spec.rb
+          line-count: true
+          split-total: 5
+          split-index: 1
+      - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
