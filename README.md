@@ -1,6 +1,6 @@
 # split-tests
 
-_Github Action for splitting a test suite using [leonid-shevtsov/split_tests](https://github.com/leonid-shevtsov/split_tests)  into equal time groups for running in parallel._
+_Github Action for splitting a test suite into equal time groups for parallel execution._
 
 ## Introduction
 
@@ -8,16 +8,30 @@ This actions allows you to split up a suite of tests so they can be executed in 
 
 ## Usage
 
+### Splitting Methods
+
+#### File Count (Default)
+
+This is a naive split into an even number of files per group. It is the default splitting method.
+
+#### Line Count
+
+Another naive split, but this time based on the number of lines per test. It is used by setting `line-count: true`
+
+#### JUnit Report
+
+This is the morst intelligent split mechanism, using previous execution durations for each test from the JUnit report. It is used by setting the `junit-path` to the location of a previous execution's JUnit results report in your repository
+
 ### Inputs
 
-|      NAME      |                         DESCRIPTION                           |   TYPE   | REQUIRED |       DEFAULT       |
-|----------------|---------------------------------------------------------------|----------|----------|---------------------|
-| `split-index`  | Index of this instance executing the tests                    | `number` | `true`   | `N/A`               |
-| `split-total`  | Total number of instances executing the tests                 | `number` | `true`   | `N/A`               |
-| `glob`         | Glob pattern to find test files (default "spec/**/*_spec.rb") | `string` | `false`  | `spec/**/*_spec.rb` |
-| `exclude-glob` | Glob pattern to exclude test files                            | `string` | `false`  | `N/A`               |
-| `junit-path`   | Path to a JUnit XML report to use for test timings            | `string` | `false`  | `N/A`               |
-| `line-count`   | Use line count to estimate test times                         | `bool`   | `false`  | `N/A`               |
+|      NAME      |                         DESCRIPTION                           |   TYPE    | REQUIRED |       DEFAULT       |
+|----------------|---------------------------------------------------------------|-----------|----------|---------------------|
+| `split-index`  | Index of this instance executing the tests                    | `integer` | ✅       |                     |
+| `split-total`  | Total number of instances executing the tests                 | `integer` | ✅       |                     |
+| `glob`         | Glob pattern to find test files (default "spec/**/*_spec.rb") | `string`  |          | `spec/**/*_spec.rb` |
+| `exclude-glob` | Glob pattern to exclude test files                            | `string`  |          | `""`                |
+| `junit-path`   | Path to a JUnit XML report to use for test timings            | `string`  |          | `""`                |
+| `line-count`   | Use line count to estimate test duration                      | `bool`    |          | `false`             |
 
 ### Outputs
 
@@ -67,4 +81,8 @@ jobs:
       - run: 'echo "This runner will execute the following tests: ${{ steps.split-tests.outputs.test-suite }}"'
 ```
 
-The full example workflow can be found at [.github/workflows/example.yaml](.github/workflows/example.yaml)
+The complete workflow can be found at [.github/workflows/example.yaml](.github/workflows/example.yaml)
+
+## Dependencies
+
+This action uses [leonid-shevtsov/split_tests](https://github.com/leonid-shevtsov/split_tests) under-the-hood to accomplish the test splitting
