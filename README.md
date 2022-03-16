@@ -20,7 +20,7 @@ Another naive split, but this time based on the number of lines per test. It is 
 
 #### JUnit Report
 
-This is the morst intelligent split mechanism, using previous execution durations for each test from the JUnit report. It is used by setting the `junit-path` to the location of a previous execution's JUnit results report in your repository
+This is the most intelligent split mechanism, using previous execution durations for each test from the JUnit report. It is used by setting the `junit-path` to the location of a previous execution's JUnit results report in your repository
 
 ### Inputs
 
