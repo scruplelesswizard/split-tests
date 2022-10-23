@@ -62,7 +62,7 @@ runs:
 
         echo $TESTS
 
-        echo "::set-output name=test-suite::$(echo $TESTS)"
+        echo "test-suite=${TESTS}" >> $GITHUB_OUTPUT          
       shell: bash
 branding:
   icon: shuffle
