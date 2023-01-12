@@ -44,7 +44,7 @@ runs:
         # setup split type
         if [ -n "${{ inputs.junit-path }}" ]; then
           echo "junit-path set. Splitting based on JUnit timings"
-          SPLIT_BY="-junit -junit-path=${{ inputs.junit-path }}"
+          SPLIT_BY="-junit -junit-path='${{ inputs.junit-path }}'"
         elif [ -n "${{ inputs.line-count }}" ]; then
           echo "line-count set. Splitting based on test line count"
           SPLIT_BY="-line-count"
@@ -58,7 +58,9 @@ runs:
           EXCLUDE_GLOB="-exclude-glob='${{ inputs.exclude-glob }}'"
         fi
 
-        TESTS=$(./split_tests ${SPLIT_BY} -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob='${{ inputs.glob }}' ${EXCLUDE_GLOB})
+        COMMAND="./split_tests $SPLIT_BY -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob='${{ inputs.glob }}' $EXCLUDE_GLOB"
+
+        TESTS=$(eval $COMMAND)
 
         echo $TESTS
 
