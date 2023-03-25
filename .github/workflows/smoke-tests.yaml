@@ -1,9 +1,11 @@
 name: Smoke Tests
 
 on:
-  push: {}
+  push:
+    branches:
+      - main
   pull_request:
-    types: 
+    types:
     - opened
     - synchronize
     - reopened
