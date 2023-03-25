@@ -22,6 +22,9 @@ inputs:
   line-count:
     description: Use line count to estimate test times (boolean)
     required: false
+  working-directory:
+    description: Run inside the specified directory
+    required: false
 outputs:
   test-suite:
     description: "A subset of tests, based on the the split index and split type"
@@ -56,6 +59,10 @@ runs:
         EXCLUDE_GLOB=""
         if [ -n "${{ inputs.exclude-glob }}" ]; then
           EXCLUDE_GLOB="-exclude-glob='${{ inputs.exclude-glob }}'"
+        fi
+        
+        if [ -n "${{ inputs.working.directory }}" ]; then
+          cd "${{ inputs.working-directory }}"
         fi
 
         TESTS=$(./split_tests ${SPLIT_BY} -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob='${{ inputs.glob }}' ${EXCLUDE_GLOB})
