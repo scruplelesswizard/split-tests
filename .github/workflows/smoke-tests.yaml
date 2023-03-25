@@ -74,10 +74,12 @@ jobs:
           repository: eliotsykes/rspec-rails-examples
           path: examples/
       - uses: ruby/setup-ruby@v1
-      - run: |
-          gem install rspec_junit_formatter
-          mkdir -p tmp/junit/
-          bin/rspec --format RspecJunitFormatter --out tmp/junit/rspec.xml
+        with:
+        ruby-version: '2.2'
+        bundler-cache: true
+      - run: gem install rspec_junit_formatter
+      - run: mkdir -p tmp/junit/
+      - run: rspec --format RspecJunitFormatter --out tmp/junit/rspec.xml
       - uses: ./
         id: split-tests
         name: Run this action
