@@ -2,6 +2,11 @@ name: Smoke Tests
 
 on:
   push: {}
+  pull_request:
+    types: 
+    - opened
+    - synchronize
+    - reopened
 
 jobs:
   syntax-test:
