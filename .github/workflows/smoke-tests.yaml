@@ -73,11 +73,16 @@ jobs:
         with:
           repository: eliotsykes/rspec-rails-examples
           path: examples/
+      - uses: ruby/setup-ruby@v1
+      - run: |
+          gem install rspec_junit_formatter
+          mkdir -p tmp/junit/
+          bin/rspec --format RspecJunitFormatter --out tmp/junit/rspec.xml
       - uses: ./
         id: split-tests
         name: Run this action
         with:
-          junit-path: examples/
+          junit-path: examples/tmp/junit/rspec.xml
           glob: examples/spec/**/*_spec.rb
           split-total: 5
           split-index: 1
