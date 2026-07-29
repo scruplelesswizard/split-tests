@@ -47,6 +47,33 @@ jobs:
           split-index: 0
       - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
 
+  smoke-test-exclude-glob:
+    runs-on: ubuntu-latest
+    name: Smoke Test Exclude Glob
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+      - uses: ./
+        id: split-tests
+        name: Run this action
+        with:
+          glob: examples/spec/**/*_spec.rb
+          exclude-glob: examples/spec/api/**/t*_spec.rb
+          split-total: 5
+          split-index: 0
+      - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
+      - run: |
+          if echo "${{ steps.split-tests.outputs.test-suite }}" | grep -q '/token_spec.rb'; then
+            echo "token_spec.rb is included in the test-suite, failing the job."
+            exit 1
+          else
+            echo "token_spec.rb is not included in the test-suite, proceeding."
+          fi
+        name: Check for token_spec.rb
+
   smoke-test-line:
     runs-on: ubuntu-latest
     name: Smoke Test Line Count
