@@ -36,7 +36,15 @@ runs:
   using: composite
   steps:
     - name: Install split_tests
-      run: curl -L "https://github.com/leonid-shevtsov/split_tests/releases/latest/download/split_tests.linux.gz" | gunzip -v > split_tests && chmod +x split_tests
+      run: |
+        BINARY_URL=https://github.com/leonid-shevtsov/split_tests/releases/latest/download
+        if [ $RUNNER_ARCH = ARM -o $RUNNER_ARCH = ARM64 ]
+        then
+          BINARY_URL=$BINARY_URL/split_tests.linux.arm64.gz
+        else
+          BINARY_URL=$BINARY_URL/split_tests.linux.gz
+        fi
+        curl -L $BINARY_URL | gunzip -v > split_tests && chmod +x split_tests
       shell: bash
     - name: Split Tests
       id: split-tests
