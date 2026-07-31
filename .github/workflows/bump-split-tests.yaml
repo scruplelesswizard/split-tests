@@ -1,0 +1,83 @@
+name: Bump split_tests version
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # weekly, Monday 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for a newer split_tests release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT_VERSION=$(grep -oP 'SPLIT_TESTS_VERSION:\s*\K\S+' action.yml)
+          LATEST_VERSION=$(gh api repos/leonid-shevtsov/split_tests/releases/latest --jq '.tag_name')
+          echo "current=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "latest=${LATEST_VERSION}" >> "$GITHUB_OUTPUT"
+          if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+            echo "up-to-date=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "up-to-date=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if a bump PR is already open
+        id: existing
+        if: steps.check.outputs.up-to-date == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: bump-split-tests-${{ steps.check.outputs.latest }}
+        run: |
+          set -euo pipefail
+          COUNT=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
+          echo "skip=$([ "$COUNT" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Compute checksum and update action.yml
+        if: steps.check.outputs.up-to-date == 'false' && steps.existing.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.check.outputs.latest }}
+        run: |
+          set -euo pipefail
+          curl -fL "https://github.com/leonid-shevtsov/split_tests/releases/download/${VERSION}/split_tests.linux.gz" -o /tmp/split_tests.gz
+          SHA256=$(sha256sum /tmp/split_tests.gz | cut -d' ' -f1)
+          sed -i "s/SPLIT_TESTS_VERSION: .*/SPLIT_TESTS_VERSION: ${VERSION}/" action.yml
+          sed -i "s/SPLIT_TESTS_SHA256: .*/SPLIT_TESTS_SHA256: ${SHA256}/" action.yml
+
+      - name: Commit and open pull request
+        if: steps.check.outputs.up-to-date == 'false' && steps.existing.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.latest }}
+          PREV_VERSION: ${{ steps.check.outputs.current }}
+        run: |
+          set -euo pipefail
+          BRANCH="bump-split-tests-${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add action.yml
+          git commit -m "Bump split_tests ${PREV_VERSION} -> ${VERSION}"
+          git push origin "$BRANCH"
+          {
+            echo "Automated bump of the pinned \`split_tests\` dependency (opened by .github/workflows/bump-split-tests.yaml)."
+            echo ""
+            echo "- Previous: \`${PREV_VERSION}\`"
+            echo "- New: \`${VERSION}\`"
+            echo ""
+            echo "The SHA256 for the new \`split_tests.linux.gz\` asset was downloaded and hashed in this workflow run, so both values are updated together — no manual checksum step needed. Review the upstream release notes at https://github.com/leonid-shevtsov/split_tests/releases/tag/${VERSION} before merging."
+          } > /tmp/pr-body.md
+          gh pr create \
+            --title "Bump split_tests ${PREV_VERSION} -> ${VERSION}" \
+            --body-file /tmp/pr-body.md \
+            --base main \
+            --head "$BRANCH"

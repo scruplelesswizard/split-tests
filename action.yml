@@ -36,33 +36,62 @@ runs:
   using: composite
   steps:
     - name: Install split_tests
-      run: curl -L "https://github.com/leonid-shevtsov/split_tests/releases/latest/download/split_tests.linux.gz" | gunzip -v > split_tests && chmod +x split_tests
+      env:
+        # Pinned to a specific leonid-shevtsov/split_tests release + checksum
+        # instead of /latest/download/, so this action's behavior can't
+        # change out from under a workflow without a commit in this repo.
+        # .github/workflows/bump-split-tests.yaml checks weekly for a new
+        # upstream release and opens a PR that updates both values together.
+        SPLIT_TESTS_VERSION: v0.5.0
+        SPLIT_TESTS_SHA256: 6988628a956f065c9eced4bb77bcc0b5c111717c1d4748b701c03afabb8349dd
+      run: |
+        set -euo pipefail
+        curl -fL "https://github.com/leonid-shevtsov/split_tests/releases/download/${SPLIT_TESTS_VERSION}/split_tests.linux.gz" -o split_tests.gz
+        if ! echo "${SPLIT_TESTS_SHA256}  split_tests.gz" | sha256sum -c -; then
+          echo "::error::split_tests ${SPLIT_TESTS_VERSION} checksum mismatch. Actual sha256: $(sha256sum split_tests.gz | cut -d' ' -f1)" >&2
+          exit 1
+        fi
+        gunzip -v split_tests.gz
+        chmod +x split_tests
       shell: bash
     - name: Split Tests
       id: split-tests
+      env:
+        SPLIT_TOTAL: ${{ inputs.split-total }}
+        SPLIT_INDEX: ${{ inputs.split-index }}
+        GLOB: ${{ inputs.glob }}
+        EXCLUDE_GLOB_INPUT: ${{ inputs.exclude-glob }}
+        JUNIT_PATH: ${{ inputs.junit-path }}
+        LINE_COUNT: ${{ inputs.line-count }}
       run: |
+        set -euo pipefail
+
         # setup split type
-        if [ -n "${{ inputs.junit-path }}" ]; then
+        if [ -n "$JUNIT_PATH" ]; then
           echo "junit-path set. Splitting based on JUnit timings"
-          SPLIT_BY="-junit -junit-path=${{ inputs.junit-path }}"
-        elif [ -n "${{ inputs.line-count }}" ]; then
+          SPLIT_BY=(-junit -junit-path="$JUNIT_PATH")
+        elif [ "$LINE_COUNT" = "true" ]; then
           echo "line-count set. Splitting based on test line count"
-          SPLIT_BY="-line-count"
+          SPLIT_BY=(-line-count)
         else
           echo "No split type arguments set. Using default"
-          SPLIT_BY=""
+          SPLIT_BY=()
         fi
 
-        EXCLUDE_GLOB=""
-        if [ -n "${{ inputs.exclude-glob }}" ]; then
-          EXCLUDE_GLOB="-exclude-glob=${{ inputs.exclude-glob }}"
+        EXCLUDE_GLOB=()
+        if [ -n "$EXCLUDE_GLOB_INPUT" ]; then
+          EXCLUDE_GLOB=(-exclude-glob="$EXCLUDE_GLOB_INPUT")
         fi
 
-        TESTS=$(./split_tests ${SPLIT_BY} -split-index=${{ inputs.split-index }} -split-total=${{ inputs.split-total }} -glob='${{ inputs.glob }}' ${EXCLUDE_GLOB})
+        TESTS=$(./split_tests "${SPLIT_BY[@]}" -split-index="$SPLIT_INDEX" -split-total="$SPLIT_TOTAL" -glob="$GLOB" "${EXCLUDE_GLOB[@]}")
 
-        echo $TESTS
+        echo "$TESTS"
 
-        echo "test-suite=${TESTS}" >> $GITHUB_OUTPUT          
+        {
+          echo "test-suite<<SPLIT_TESTS_EOF"
+          echo "$TESTS"
+          echo "SPLIT_TESTS_EOF"
+        } >> "$GITHUB_OUTPUT"
       shell: bash
 branding:
   icon: shuffle
