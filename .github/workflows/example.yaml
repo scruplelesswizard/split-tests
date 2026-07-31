@@ -35,7 +35,7 @@ jobs:
       matrix:
         runner-index: ${{ fromjson(needs.runner-indexes.outputs.json) }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           repository: eliotsykes/rspec-rails-examples
           path: examples/
