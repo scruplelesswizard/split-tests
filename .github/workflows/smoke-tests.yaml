@@ -93,6 +93,71 @@ jobs:
           split-index: 1
       - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
 
+  smoke-test-correctness:
+    runs-on: ubuntu-latest
+    name: Smoke Test Correctness (partition coverage)
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+      - uses: ./
+        id: split-0
+        name: Split index 0
+        with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: 3
+          split-index: 0
+      - uses: ./
+        id: split-1
+        name: Split index 1
+        with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: 3
+          split-index: 1
+      - uses: ./
+        id: split-2
+        name: Split index 2
+        with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: 3
+          split-index: 2
+      - name: Assert partitions are non-empty, disjoint, and cover the full glob
+        env:
+          PARTITION_0: ${{ steps.split-0.outputs.test-suite }}
+          PARTITION_1: ${{ steps.split-1.outputs.test-suite }}
+          PARTITION_2: ${{ steps.split-2.outputs.test-suite }}
+        run: |
+          set -euo pipefail
+
+          echo "$PARTITION_0" | tr ' ' '\n' | sed '/^$/d' | sort -u > /tmp/p0.txt
+          echo "$PARTITION_1" | tr ' ' '\n' | sed '/^$/d' | sort -u > /tmp/p1.txt
+          echo "$PARTITION_2" | tr ' ' '\n' | sed '/^$/d' | sort -u > /tmp/p2.txt
+
+          for f in /tmp/p0.txt /tmp/p1.txt /tmp/p2.txt; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Partition $f is empty - split-total=3 across this fixture repo should never produce an empty partition"
+              exit 1
+            fi
+          done
+
+          OVERLAP=$(cat /tmp/p0.txt /tmp/p1.txt /tmp/p2.txt | sort | uniq -d || true)
+          if [ -n "$OVERLAP" ]; then
+            echo "::error::Partitions are not disjoint - the following file(s) appear in more than one split-index: $OVERLAP"
+            exit 1
+          fi
+
+          cat /tmp/p0.txt /tmp/p1.txt /tmp/p2.txt | sort -u > /tmp/union.txt
+          find examples/spec -name '*_spec.rb' | sort -u > /tmp/expected.txt
+
+          if ! diff -u /tmp/expected.txt /tmp/union.txt; then
+            echo "::error::Union of all partitions does not match the full glob - some file was dropped or invented"
+            exit 1
+          fi
+
+          echo "OK: $(wc -l < /tmp/expected.txt) files, split into 3 non-empty disjoint partitions with full coverage"
+
   smoke-test-junit:
     runs-on: ubuntu-latest
     name: Smoke Test JUnit
