@@ -104,7 +104,7 @@ jobs:
           path: examples/
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '2.2'
+          ruby-version: '3.2'
           bundler-cache: true
       - run: gem install rspec_junit_formatter
       - run: mkdir -p tmp/junit/
