@@ -6,6 +6,8 @@ _Github Action for splitting a test suite into equal time groups for parallel ex
 
 This actions allows you to split up a suite of tests so they can be executed in parallel across a fleet of runners. The overall goal is to reduce developer feedback time by distributing the load.
 
+Runs on `ubuntu` (Linux) runners only — `split_tests` is installed as a Linux binary.
+
 ## Usage
 
 ### Splitting Methods
@@ -59,7 +61,7 @@ jobs:
           MAX_INDEX=$((${{ env.total-runners }}-1))
           INDEX_LIST=$(seq 0 ${MAX_INDEX})
           INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
-          echo "::set-output name=json::${INDEX_JSON}"
+          echo "json=${INDEX_JSON}" >> "$GITHUB_OUTPUT"
 
   run-parallel-tests:
     runs-on: ubuntu-latest
@@ -70,8 +72,8 @@ jobs:
       matrix:
         runner-index: ${{ fromjson(needs.runner-indexes.outputs.json) }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: chaosaffe/split-tests@v1-alpha.1
+      - uses: actions/checkout@v4
+      - uses: scruplelesswizard/split-tests@v1
         id: split-tests
         name: Split tests
         with:
