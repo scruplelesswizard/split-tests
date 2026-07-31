@@ -51,7 +51,7 @@ runs:
           echo "::error::split_tests ${SPLIT_TESTS_VERSION} checksum mismatch. Actual sha256: $(sha256sum split_tests.gz | cut -d' ' -f1)" >&2
           exit 1
         fi
-        gunzip -v split_tests.gz
+        gunzip -vf split_tests.gz
         chmod +x split_tests
       shell: bash
     - name: Split Tests
