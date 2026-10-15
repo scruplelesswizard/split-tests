@@ -1,5 +1,5 @@
 name: Split Tests
-author: chaosaffe@users.noreply.github.com
+author: scruplelesswizard
 description: Splits test suite for parallelization with equal time
 inputs:
   split-total:
