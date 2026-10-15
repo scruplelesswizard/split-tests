@@ -183,3 +183,126 @@ jobs:
           split-total: 5
           split-index: 1
       - run: echo "The output test suite is ${{ steps.split-tests.outputs.test-suite }}"
+
+  smoke-test-working-directory:
+    runs-on: ubuntu-latest
+    name: Smoke Test Working Directory
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+      - uses: ./
+        id: relative
+        name: Relative working-directory
+        with:
+          working-directory: examples
+          glob: spec/**/*_spec.rb
+          split-total: 1
+          split-index: 0
+      - uses: ./
+        id: absolute
+        name: Absolute working-directory
+        with:
+          working-directory: ${{ github.workspace }}/examples
+          glob: spec/**/*_spec.rb
+          split-total: 1
+          split-index: 0
+      - name: Assert output is relative to working-directory and covers the glob
+        env:
+          RELATIVE: ${{ steps.relative.outputs.test-suite }}
+          ABSOLUTE: ${{ steps.absolute.outputs.test-suite }}
+        run: |
+          set -euo pipefail
+
+          echo "$RELATIVE" | tr ' ' '\n' | sed '/^$/d' | sort -u > /tmp/relative.txt
+          echo "$ABSOLUTE" | tr ' ' '\n' | sed '/^$/d' | sort -u > /tmp/absolute.txt
+          (cd examples && find spec -name '*_spec.rb' | sort -u) > /tmp/expected.txt
+
+          if [ ! -s /tmp/expected.txt ]; then
+            echo "::error::Fixture has no spec files, the test is not testing anything"
+            exit 1
+          fi
+
+          if ! diff -u /tmp/expected.txt /tmp/relative.txt; then
+            echo "::error::Relative working-directory output does not match the files under examples/spec"
+            exit 1
+          fi
+
+          if ! diff -u /tmp/relative.txt /tmp/absolute.txt; then
+            echo "::error::Absolute and relative working-directory outputs differ"
+            exit 1
+          fi
+
+          if grep -q '^examples/' /tmp/relative.txt; then
+            echo "::error::Output paths should be relative to working-directory, not the workspace"
+            exit 1
+          fi
+
+          echo "OK: $(wc -l < /tmp/expected.txt) files, paths relative to working-directory"
+
+  smoke-test-expected-failures:
+    runs-on: ubuntu-latest
+    name: Smoke Test Expected Failures
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+      - uses: ./
+        id: missing-working-directory
+        name: Nonexistent working-directory
+        continue-on-error: true
+        with:
+          working-directory: examples/does-not-exist
+          glob: spec/**/*_spec.rb
+          split-total: 2
+          split-index: 0
+      - uses: ./
+        id: index-out-of-range
+        name: split-index equal to split-total
+        continue-on-error: true
+        with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: 2
+          split-index: 2
+      - uses: ./
+        id: zero-total
+        name: split-total of zero
+        continue-on-error: true
+        with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: 0
+          split-index: 0
+      - uses: ./
+        id: control
+        name: Control, valid inputs must still pass
+        continue-on-error: true
+        with:
+          glob: examples/spec/**/*_spec.rb
+          split-total: 2
+          split-index: 1
+      - name: Assert each invalid input failed and the control passed
+        env:
+          MISSING_WORKING_DIRECTORY: ${{ steps.missing-working-directory.outcome }}
+          INDEX_OUT_OF_RANGE: ${{ steps.index-out-of-range.outcome }}
+          ZERO_TOTAL: ${{ steps.zero-total.outcome }}
+          CONTROL: ${{ steps.control.outcome }}
+        run: |
+          set -euo pipefail
+          status=0
+          expect() {
+            if [ "$2" != "$3" ]; then
+              echo "::error::$1: expected outcome '$3' but got '$2'"
+              status=1
+            else
+              echo "OK: $1 -> $2"
+            fi
+          }
+          expect "nonexistent working-directory" "$MISSING_WORKING_DIRECTORY" failure
+          expect "split-index equal to split-total" "$INDEX_OUT_OF_RANGE" failure
+          expect "split-total of zero" "$ZERO_TOTAL" failure
+          expect "valid inputs (control)" "$CONTROL" success
+          exit "$status"
