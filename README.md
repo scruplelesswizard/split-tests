@@ -58,6 +58,7 @@ Timings must be per test **file**. If your runner writes one report per worker, 
 | `exclude-glob` | Glob pattern to exclude test files                            | `string`  |          | `""`                |
 | `junit-path`   | Path to a JUnit XML report to use for test timings            | `string`  |          | `""`                |
 | `line-count`   | Use line count to estimate test duration                      | `bool`    |          | `false`             |
+| `working-directory` | Directory to run in, relative to `$GITHUB_WORKSPACE` (or absolute). `glob`, `exclude-glob` and `junit-path` are resolved relative to it, and `test-suite` paths are relative to it. Useful for monorepos | `string` |  | `""` (the workspace) |
 
 ### Outputs
 
