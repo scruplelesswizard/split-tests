@@ -40,13 +40,17 @@ jobs:
 
       # kcov is built from source because Ubuntu 24.04 (ubuntu-latest) no
       # longer packages it, and the v42 release binary targets Ubuntu 22.04.
-      # The install prefix is cached per kcov version and runner image OS.
+      # The install prefix is cached per kcov version and runner OS release.
+      - name: Detect runner OS release
+        id: os-release
+        run: echo "id=$(. /etc/os-release && echo "$ID-$VERSION_ID")" >> "$GITHUB_OUTPUT"
+
       - name: Cache kcov
         id: kcov-cache
         uses: actions/cache@v4
         with:
           path: ~/kcov
-          key: kcov-${{ env.KCOV_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}
+          key: kcov-${{ env.KCOV_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.os-release.outputs.id }}
 
       - name: Install kcov dependencies
         # Needed at runtime too, so this runs even on a cache hit.
