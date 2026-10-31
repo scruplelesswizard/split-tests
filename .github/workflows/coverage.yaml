@@ -112,7 +112,7 @@ jobs:
               lines = []
               if env is not None:
                   for k, v in env.value:
-                      if "${{" not in v.value:
+                      if "{{" not in v.value:
                           lines.append(f"{k.value}={v.value}")
               (out / f"step_{i}.env").write_text("\n".join(lines) + "\n")
           PY
