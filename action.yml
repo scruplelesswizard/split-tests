@@ -1,5 +1,5 @@
 name: Split Tests
-author: chaosaffe@users.noreply.github.com
+author: scruplelesswizard
 description: Splits test suite for parallelization with equal time
 inputs:
   split-total:
@@ -22,6 +22,10 @@ inputs:
   line-count:
     description: Use line count to estimate test times (boolean)
     required: false
+  working-directory:
+    description: Directory to run in, relative to GITHUB_WORKSPACE (or absolute). The glob, exclude-glob and junit-path inputs are resolved relative to it, and the output paths are relative to it. Defaults to GITHUB_WORKSPACE.
+    required: false
+    default: ""
 outputs:
   test-suite:
     description: "A subset of tests, based on the the split index and split type"
@@ -46,6 +50,9 @@ runs:
         SPLIT_TESTS_SHA256: 6988628a956f065c9eced4bb77bcc0b5c111717c1d4748b701c03afabb8349dd
       run: |
         set -euo pipefail
+        # Install into GITHUB_WORKSPACE so the binary can be found by absolute
+        # path regardless of the working-directory input.
+        cd "$GITHUB_WORKSPACE"
         curl -fL "https://github.com/leonid-shevtsov/split_tests/releases/download/${SPLIT_TESTS_VERSION}/split_tests.linux.gz" -o split_tests.gz
         if ! echo "${SPLIT_TESTS_SHA256}  split_tests.gz" | sha256sum -c -; then
           echo "::error::split_tests ${SPLIT_TESTS_VERSION} checksum mismatch. Actual sha256: $(sha256sum split_tests.gz | cut -d' ' -f1)" >&2
@@ -63,8 +70,11 @@ runs:
         EXCLUDE_GLOB_INPUT: ${{ inputs.exclude-glob }}
         JUNIT_PATH: ${{ inputs.junit-path }}
         LINE_COUNT: ${{ inputs.line-count }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: |
         set -euo pipefail
+
+        SPLIT_TESTS_BIN="$GITHUB_WORKSPACE/split_tests"
 
         # setup split type
         if [ -n "$JUNIT_PATH" ]; then
@@ -83,7 +93,17 @@ runs:
           EXCLUDE_GLOB=(-exclude-glob="$EXCLUDE_GLOB_INPUT")
         fi
 
-        TESTS=$(./split_tests "${SPLIT_BY[@]}" -split-index="$SPLIT_INDEX" -split-total="$SPLIT_TOTAL" -glob="$GLOB" "${EXCLUDE_GLOB[@]}")
+        # Resolve relative paths from the workspace, then run from there.
+        cd "$GITHUB_WORKSPACE"
+        if [ -n "$WORKING_DIRECTORY" ]; then
+          if [ ! -d "$WORKING_DIRECTORY" ]; then
+            echo "::error::working-directory '$WORKING_DIRECTORY' does not exist"
+            exit 1
+          fi
+          cd "$WORKING_DIRECTORY"
+        fi
+
+        TESTS=$("$SPLIT_TESTS_BIN" "${SPLIT_BY[@]}" -split-index="$SPLIT_INDEX" -split-total="$SPLIT_TOTAL" -glob="$GLOB" "${EXCLUDE_GLOB[@]}")
 
         echo "$TESTS"
 

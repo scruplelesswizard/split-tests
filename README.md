@@ -1,12 +1,34 @@
 # split-tests
 
-_Github Action for splitting a test suite into equal time groups for parallel execution._
+[![Smoke Tests](https://github.com/scruplelesswizard/split-tests/actions/workflows/smoke-tests.yaml/badge.svg)](https://github.com/scruplelesswizard/split-tests/actions/workflows/smoke-tests.yaml)
+[![Latest release](https://img.shields.io/github/v/release/scruplelesswizard/split-tests)](https://github.com/scruplelesswizard/split-tests/releases)
+
+_GitHub Action for splitting a test suite into equal time groups for parallel execution._
 
 ## Introduction
 
-This actions allows you to split up a suite of tests so they can be executed in parallel across a fleet of runners. The overall goal is to reduce developer feedback time by distributing the load.
+This action splits a suite of tests so they can run in parallel across a fleet of runners. The goal is to reduce developer feedback time by distributing the load evenly, so no single runner is left running the slow tests while the others sit idle.
 
-Runs on `ubuntu` (Linux) runners only — `split_tests` is installed as a Linux binary.
+- **Any test runner.** The action only decides which test _files_ each runner gets, and outputs them as a space-separated string. Pass that string to RSpec, pytest, Jest, `go test` or anything else.
+- **Three ways to split:** by file count, by line count, or by real durations from a previous JUnit report.
+- **Pinned and checksummed.** The `split_tests` binary is pinned to a specific release and verified by SHA256. A weekly workflow opens a PR when upstream releases a new version.
+
+Runs on `ubuntu` (Linux) runners only, because `split_tests` is installed as a Linux binary.
+
+## Quick start
+
+```yaml
+- uses: actions/checkout@v4
+- uses: scruplelesswizard/split-tests@v1
+  id: split
+  with:
+    glob: "test/**/*_test.py"
+    split-total: 4
+    split-index: ${{ matrix.index }}   # 0..3, one per matrix job
+- run: pytest ${{ steps.split.outputs.test-suite }}
+```
+
+The `glob` default is `spec/**/*_spec.rb` (RSpec), so set it for other languages. See the full matrix example [below](#example-workflow).
 
 ## Usage
 
@@ -24,6 +46,8 @@ Another naive split, but this time based on the number of lines per test. It is 
 
 This is the most intelligent split mechanism, using previous execution durations for each test from the JUnit report. It is used by setting the `junit-path` to the location of a previous execution's JUnit results report in your repository
 
+Timings must be per test **file**. If your runner writes one report per worker, or per-test-case reports, merge them first with [junit-munger](https://github.com/scruplelesswizard/junit-munger), then point `junit-path` at the merged file.
+
 ### Inputs
 
 |      NAME      |                         DESCRIPTION                           |   TYPE    | REQUIRED |       DEFAULT       |
@@ -34,6 +58,7 @@ This is the most intelligent split mechanism, using previous execution durations
 | `exclude-glob` | Glob pattern to exclude test files                            | `string`  |          | `""`                |
 | `junit-path`   | Path to a JUnit XML report to use for test timings            | `string`  |          | `""`                |
 | `line-count`   | Use line count to estimate test duration                      | `bool`    |          | `false`             |
+| `working-directory` | Directory to run in, relative to `$GITHUB_WORKSPACE` (or absolute). `glob`, `exclude-glob` and `junit-path` are resolved relative to it, and `test-suite` paths are relative to it. Useful for monorepos | `string` |  | `""` (the workspace) |
 
 ### Outputs
 

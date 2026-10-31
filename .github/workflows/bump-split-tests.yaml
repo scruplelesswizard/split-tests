@@ -13,7 +13,7 @@ jobs:
   check-and-bump:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for a newer split_tests release
         id: check
