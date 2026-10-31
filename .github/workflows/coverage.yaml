@@ -1,0 +1,214 @@
+name: Coverage
+
+# Reports line coverage of the bash in action.yml to GitHub Code Quality.
+#
+# The smoke tests run the action through the Actions runner (`uses: ./`), which
+# nothing can trace, so this job extracts the same `run:` blocks from action.yml
+# and replays them under kcov across the same scenarios.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+    - opened
+    - synchronize
+    - reopened
+
+permissions:
+  contents: read
+  code-quality: write
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    name: action.yml Coverage
+    env:
+      KCOV_VERSION: v43
+      STEPS: coverage/steps
+      OUT: coverage/kcov
+      GLOB: examples/spec/**/*_spec.rb
+      JUNIT: coverage/rspec.xml
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@v4
+        with:
+          repository: eliotsykes/rspec-rails-examples
+          path: examples/
+
+      # kcov is built from source because Ubuntu 24.04 (ubuntu-latest) no
+      # longer packages it, and the v42 release binary targets Ubuntu 22.04.
+      # The install prefix is cached per kcov version and runner image OS.
+      - name: Cache kcov
+        id: kcov-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/kcov
+          key: kcov-${{ env.KCOV_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}
+
+      - name: Install kcov dependencies
+        # Needed at runtime too, so this runs even on a cache hit.
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential cmake git ca-certificates pkg-config python3 \
+            binutils-dev libcurl4-openssl-dev libdw-dev libelf-dev libiberty-dev \
+            libssl-dev zlib1g-dev
+
+      - name: Build kcov
+        if: steps.kcov-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          src=$(mktemp -d)
+          git clone -q --depth 1 --branch "$KCOV_VERSION" https://github.com/SimonKagstrom/kcov "$src"
+          cmake -S "$src" -B "$src/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/kcov"
+          cmake --build "$src/build" -j"$(nproc)"
+          cmake --install "$src/build"
+
+      - name: Add kcov to PATH
+        run: |
+          echo "$HOME/kcov/bin" >> "$GITHUB_PATH"
+          "$HOME/kcov/bin/kcov" --version
+
+      - name: Extract action.yml steps
+        # Writes coverage/steps/step_N.sh (one per `run:` block) and step_N.env
+        # (literal `env:` values). Each script is padded with blank lines so its
+        # line numbers match action.yml.
+        run: |
+          set -euo pipefail
+          python3 -I - action.yml "$STEPS" <<'PY'
+          import pathlib
+          import sys
+
+          import yaml
+
+          src, out = sys.argv[1], pathlib.Path(sys.argv[2])
+          out.mkdir(parents=True, exist_ok=True)
+
+          root = yaml.compose(open(src))
+
+
+          def get(node, key):
+              for k, v in node.value:
+                  if k.value == key:
+                      return v
+              return None
+
+
+          for i, step in enumerate(get(get(root, "runs"), "steps").value):
+              run = get(step, "run")
+              if run is None:
+                  continue
+              # The block scalar's indicator ("|") is on start_mark.line
+              # (0-indexed), so its content starts on the next line.
+              script = out / f"step_{i}.sh"
+              script.write_text("#!/usr/bin/env bash" + "\n" * (run.start_mark.line + 1) + run.value)
+              script.chmod(0o755)
+
+              env = get(step, "env")
+              lines = []
+              if env is not None:
+                  for k, v in env.value:
+                      if "${{" not in v.value:
+                          lines.append(f"{k.value}={v.value}")
+              (out / f"step_{i}.env").write_text("\n".join(lines) + "\n")
+          PY
+
+      - name: Cover Install split_tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          set -a
+          . "$STEPS/step_0.env"
+          set +a
+          kcov --include-pattern=step_ "$OUT/install" "$STEPS/step_0.sh"
+
+      - name: Cover Split Tests
+        run: |
+          set -euo pipefail
+
+          # Minimal JUnit report built from the fixture's spec files.
+          python3 -I - "$JUNIT" <<'PY'
+          import glob, sys
+          files = sorted(glob.glob("examples/spec/**/*_spec.rb", recursive=True))
+          cases = "".join(
+              f'<testcase classname="{f}" name="t{i}" file="{f}" time="{i + 1}.0"/>'
+              for i, f in enumerate(files)
+          )
+          open(sys.argv[1], "w").write(
+              f'<?xml version="1.0"?><testsuite tests="{len(files)}">{cases}</testsuite>'
+          )
+          PY
+
+          # scenario NAME [VAR=value ...]: run the split step with these inputs.
+          scenario() {
+            local name=$1
+            shift
+            env SPLIT_TOTAL=5 SPLIT_INDEX=0 GLOB="$GLOB" \
+              JUNIT_PATH= LINE_COUNT= EXCLUDE_GLOB_INPUT= \
+              GITHUB_OUTPUT="$(mktemp)" "$@" \
+              kcov --include-pattern=step_ "$OUT/$name" "$STEPS/step_1.sh"
+          }
+
+          scenario default
+          scenario junit JUNIT_PATH="$JUNIT"
+          scenario line-count LINE_COUNT=true
+          scenario exclude-glob EXCLUDE_GLOB_INPUT='examples/spec/api/**/t*_spec.rb'
+
+      - name: Build Cobertura report for action.yml
+        # Merges the scenarios, then maps the step scripts onto action.yml as a
+        # single file so Code Quality can attribute lines to it.
+        run: |
+          set -euo pipefail
+          kcov --merge coverage/merged "$OUT"/*/
+          python3 -I - "$(find coverage/merged -name cobertura.xml -path '*kcov-merged*' | head -n1)" coverage/cobertura.xml action.yml <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          src, dst, target = sys.argv[1:4]
+          tree = ET.parse(src)
+          root = tree.getroot()
+
+          lines = {}
+          for line in root.iter("line"):
+              n = int(line.get("number"))
+              # A line in several step scripts is hit if any of them hit it.
+              prev = lines.get(n)
+              if prev is None or int(line.get("hits", "0")) > int(prev.get("hits", "0")):
+                  lines[n] = line
+
+          for sources in root.findall("sources"):
+              root.remove(sources)
+          sources = ET.Element("sources")
+          ET.SubElement(sources, "source").text = "."
+          root.insert(0, sources)
+
+          packages = root.find("packages")
+          for child in list(packages):
+              packages.remove(child)
+          package = ET.SubElement(packages, "package", name=".")
+          cls = ET.SubElement(ET.SubElement(package, "classes"), "class", name=target, filename=target)
+          ET.SubElement(cls, "methods")
+          cls_lines = ET.SubElement(cls, "lines")
+          for n in sorted(lines):
+              cls_lines.append(lines[n])
+
+          covered = sum(1 for l in lines.values() if int(l.get("hits", "0")) > 0)
+          rate = f"{covered / len(lines):.4f}" if lines else "0"
+          for el in (root, package, cls):
+              el.set("line-rate", rate)
+          tree.write(dst, xml_declaration=True, encoding="utf-8")
+          print(f"{covered}/{len(lines)} lines covered")
+          PY
+
+      - name: Upload coverage report
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage/cobertura.xml
+          language: bash
+          label: code-coverage/kcov
