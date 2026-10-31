@@ -152,7 +152,7 @@ jobs:
             local name=$1
             shift
             env SPLIT_TOTAL=5 SPLIT_INDEX=0 GLOB="$GLOB" \
-              JUNIT_PATH= LINE_COUNT= EXCLUDE_GLOB_INPUT= \
+              JUNIT_PATH= LINE_COUNT= EXCLUDE_GLOB_INPUT= WORKING_DIRECTORY= \
               GITHUB_OUTPUT="$(mktemp)" "$@" \
               kcov --include-pattern=step_ "$OUT/$name" "$STEPS/step_1.sh"
           }
@@ -161,6 +161,14 @@ jobs:
           scenario junit JUNIT_PATH="$JUNIT"
           scenario line-count LINE_COUNT=true
           scenario exclude-glob EXCLUDE_GLOB_INPUT='examples/spec/api/**/t*_spec.rb'
+          scenario working-directory-relative WORKING_DIRECTORY=examples GLOB='spec/**/*_spec.rb'
+          scenario working-directory-absolute WORKING_DIRECTORY="$GITHUB_WORKSPACE/examples" GLOB='spec/**/*_spec.rb'
+
+          # The step must reject a nonexistent working-directory.
+          if scenario working-directory-missing WORKING_DIRECTORY=examples/does-not-exist GLOB='spec/**/*_spec.rb'; then
+            echo "::error::A nonexistent working-directory was accepted"
+            exit 1
+          fi
 
       - name: Build Cobertura report for action.yml
         # Merges the scenarios, then maps the step scripts onto action.yml as a
