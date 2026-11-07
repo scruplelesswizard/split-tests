@@ -47,7 +47,7 @@ jobs:
 
       - name: Cache kcov
         id: kcov-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/kcov
           key: kcov-${{ env.KCOV_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.os-release.outputs.id }}
