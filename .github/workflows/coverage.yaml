@@ -219,7 +219,7 @@ jobs:
       - name: Upload coverage report
         # Fork PRs have no access to secrets, so only upload from this repo.
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: coverage/cobertura.xml
           disable_search: true
