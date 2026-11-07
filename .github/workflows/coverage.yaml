@@ -30,10 +30,10 @@ jobs:
       GLOB: examples/spec/**/*_spec.rb
       JUNIT: coverage/rspec.xml
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: eliotsykes/rspec-rails-examples
           path: examples/
